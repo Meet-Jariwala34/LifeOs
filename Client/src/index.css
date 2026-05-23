@@ -19,3 +19,15 @@
     height: 50vh ;
     width : 40vw;
 }
+
+#SystemOnline {
+    background-color: #141414;
+    background-blend-mode: darken, luminosity;
+    border : 1px solid #212222;
+    transition: 0.6s;
+}
+
+#SystemOnline:hover{
+    box-shadow: 1px 1px 2px white;
+    border : 1px solid white;
+}

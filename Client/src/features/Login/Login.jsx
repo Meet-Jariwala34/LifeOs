@@ -12,13 +12,21 @@ export default function Login() {
   const handlePasswordChange = (e) =>{
     setPassword(e.target.value);
   }
+  
+  const handleKeyDown = (event) => {
+    // Check if the pressed key is Enter
+    if (event.key === 'Enter') {
+      handleOnLogin();
+    }
+  };
 
   const handleOnLogin = async () => {
     try {
       const res = await axios.post("http://localhost:5000/api/auth/login", {password : password})
       if(res.data.success){
         console.log(res.data.message);
-        localStorage.setItem('token' , res.data.token);
+        const now = new Date();
+        localStorage.setItem('LifeOs_token' , {token : res.data.token , expiry : (now.getTime() + 100*60*60*8) } );
         navigate('/');
       }else{
         console.log(res.data.message)
@@ -44,7 +52,7 @@ export default function Login() {
         {/* Displayed content */}
         <h1 className='text-white z-10'>Welcome Warrior</h1>
         <div className='h-32 w-80 rounded-2xl bg-[rgba(0,0,0,0.4)] z-10 flex flex-col p-2 items-center gap-2'>
-          <input onChange={handlePasswordChange} value={password} type="text" placeholder='Enter you password' className='h-12 w-full p-2 border-2 rounded-2xl outline-none text-2xl'/>
+          <input onKeyDown={handleKeyDown} onChange={handlePasswordChange} value={password} type="text" placeholder='Enter you password' className='h-12 w-full p-2 border-2 rounded-2xl outline-none text-2xl'/>
           <button onClick={handleOnLogin} className='h-12 w-full p-2 bg-blue-600 text-white font-bold text-3xl rounded-2xl flex justify-center items-center cursor-pointer hover:bg-blue-700'>Login</button>
         </div>
 
