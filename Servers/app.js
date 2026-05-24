@@ -13,5 +13,9 @@ app.use(express.json());
 app.use('/api/auth', auth);
 app.use("/api/dsa",dsa);
 
+app.get('/api/ready', (req, res) => {
+  res.json({ message: "Hello World !!" });
+});
+
 // Export the configured app instance
 module.exports = app;
