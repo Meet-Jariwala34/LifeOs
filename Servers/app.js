@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const auth = require('./routes/login');
 const dsa = require('./routes/dsa');
+const project = require('./routes/project');
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 //Admin login route
 app.use('/api/auth', auth);
 app.use("/api/dsa",dsa);
+app.use('/api/projects', project);
 
 app.get('/api/ready', (req, res) => {
   res.json({ message: "Hello World !!" });
