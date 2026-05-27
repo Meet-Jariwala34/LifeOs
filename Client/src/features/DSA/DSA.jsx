@@ -31,38 +31,38 @@ export default function DSA() {
   const strokeDashoffset = circumference - (stats.progress / 100) * circumference;
 
   // 📡 1. Network Operation: Fetch active queue from your backend
-  const fetchDailyDeck = async (silent = false) => {
-    setErrorMessage('');
-    // Only invoke the global full-screen spinner on hard initial mounts, not background refreshes
-    if (!silent) setLoading(true);
-    try {
-      const minimumDelayPromise = new Promise(resolve => setTimeout(resolve, 2500));
-      const [response] = await Promise.all([
-        API.get('/dsa/getDeck'),
-        minimumDelayPromise
-      ]);
+ const fetchDailyDeck = async (silent = false, forceRefresh = false) => {
+  setErrorMessage('');
+  if (!silent) setLoading(true);
+  try {
+    const minimumDelayPromise = new Promise(resolve => setTimeout(resolve, 2500));
+    const [response] = await Promise.all([
+      API.get(`/dsa/getDeck${forceRefresh ? '?forceRefresh=true' : ''}`),
+      minimumDelayPromise
+    ]);
 
-      // Once BOTH promises resolve, map your backend properties smoothly
-      if (response.data.success) {
-        setDailyDeck(response.data.data);
-        
-        const solvedToday = response.data.solvedTodayCount || 0;
-        const targetGoal = 5; 
-        
-        setStats({
-          solvedToday: solvedToday,
-          targetToday: targetGoal,
-          progress: Math.min(Math.round((solvedToday / targetGoal) * 100), 100)
-        });
-      }
-
-    } catch (err) {
-      console.error('Error connecting to operational database nodes:', err);
-      setErrorMessage('Failed to fetch algorithmic data nodes from server.');
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+    if (response.data.success) {
+  setDailyDeck(response.data.data);
+  
+  // 🎯 FIX: Log the direct network array response because setDailyDeck hasn't flushed to memory yet!
+  console.log("📡 Fresh Deck Payload Synchronized:", response.data.data);
+  
+  const solvedToday = response.data.solvedTodayCount || 0;
+  const targetGoal = 5; 
+  
+  setStats({
+    solvedToday: solvedToday,
+    targetToday: targetGoal,
+    progress: Math.min(Math.round((solvedToday / targetGoal) * 100), 100)
+  });
+}
+  } catch (err) {
+    console.error('Error connecting to operational database nodes:', err);
+    setErrorMessage('Failed to fetch algorithmic data nodes from server.');
+  } finally {
+    if (!silent) setLoading(false);
+  }
+};
 
   // 💓 2. Automated Heartbeat Check Polling Loop
   const checkServerHealth = async () => {
@@ -89,39 +89,45 @@ export default function DSA() {
   }, []);
 
   // ⚡ 4. UI Mutation Action: Sync your Spaced Repetition choice with the database
-  const handleStatusUpdate = async (problem, index, actionType) => {
-    const rowKey = problem._id || String(index);
+// client/src/features/DSA/DSA.jsx
 
-    // Guard: Prevent double firing if this row is currently parsing a payload
-    if (syncingRows[rowKey]) return;
+const handleStatusUpdate = async (problem, index, actionType) => {
+  const rowKey = problem._id || String(index);
 
-    // Set the specific action processing status for this localized row index
-    setSyncingRows(prev => ({ ...prev, [rowKey]: actionType }));
+  // 1. Guard: Stop duplicate execution streams
+  if (syncingRows[rowKey]) return;
 
-    try {
-      const response = await API.post('/dsa/updateStatus', {
-        title: problem.title,
-        topic: problem.topic,
-        difficulty: problem.difficulty,
-        problemUrl: problem.problemUrl,
-        action: actionType // Expects 'PASSED' (Mastered) or 'FAILED' (Needs Revision)
-      });
+  // 2. Lock row UI and display inline micro-spinner
+  setSyncingRows(prev => ({ ...prev, [rowKey]: actionType }));
+
+  try {
+    // 🎯 TARGET: Matches your exact backend route: router.post("/updateStatus")
+    const response = await API.post('/dsa/updateStatus', {
+      title: problem.title,
+      topic: problem.topicTag, // 💎 Aligns 'topicTag' with backend database expectations
+      difficulty: problem.difficulty,
+      problemUrl: problem.problemUrl,
+      action: actionType // Expects 'PASSED' or 'FAILED'
+    });
+    
+    if (response.data.success) {
+      console.log(`📡 Spaced Repetition updated: ${problem.title} -> ${actionType}`);
       
-      if (response.data.success) {
-        // Automatically re-fetch data stream silently in the background to avoid layout pops
-        await fetchDailyDeck(true);
-      }
-    } catch (err) {
-      console.error('Failed to update task timeline snapshot:', err);
-    } finally {
-      // Clear out the tracking token to unlock operation rules for this index row
-      setSyncingRows(prev => {
-        const next = { ...prev };
-        delete next[rowKey];
-        return next;
-      });
+      // 3. Silently fetch updated data structures to animate the top progress wheel gauge
+      await fetchDailyDeck(true);
     }
-  };
+  } catch (err) {
+    console.error('Failed to update task timeline snapshot:', err);
+    setErrorMessage('Network error syncing status update to server.');
+  } finally {
+    // 4. Release UI input lock
+    setSyncingRows(prev => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
+    });
+  }
+};
 
   // Helper utility to match difficulty flags to clean color states
   const getDifficultyStyles = (diff) => {
@@ -175,13 +181,19 @@ export default function DSA() {
               <p className="text-sm text-gray-400 max-w-md leading-relaxed">
                 Tracking consistent Blind 75 logic blocks. Your active spacing replication intervals prevent cognitive pattern decay.
               </p>
-              <div className="pt-2">
+              <div className="pt-2 flex gap-4">
                 <button 
                   onClick={() => fetchDailyDeck(false)} 
                   className="rounded-xl bg-white px-5 py-3 font-medium text-xs text-black transition-all hover:bg-gray-200 active:scale-95"
                 >
                   Refresh Queue Matrix
                 </button>
+                <button 
+    onClick={() => fetchDailyDeck(false, true)} 
+    className="rounded-xl bg-white px-5 py-3 font-medium text-xs text-black transition-all hover:bg-zinc-200 active:scale-95 shadow-lg shadow-white/5 font-mono uppercase tracking-wider"
+  >
+    Request Next Set
+  </button>
               </div>
             </div>
 
@@ -279,7 +291,7 @@ export default function DSA() {
                   return (
                     <tr key={rowKey} className={`group hover:bg-[#131313]/30 transition-colors ${isRowSyncing ? 'opacity-60 bg-zinc-900/10' : ''}`}>
                       <td className="p-5 font-mono text-gray-600 group-hover:text-gray-400 transition-colors">
-                        #{String(index + 1).padStart(3, '0')}
+                        #{problem.problemNumber}
                       </td>
                       <td className="p-5">
                         <a 

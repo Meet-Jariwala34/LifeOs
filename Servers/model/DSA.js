@@ -3,6 +3,8 @@ const mongoose = require('mongoose');
 
 const DsaProblemSchema = new mongoose.Schema({
   title: { type: String, required: true, unique: true, trim: true },
+  problemNumber: { type: Number },
+  topic: { type: String },
   topic: { type: String, required: true },
   difficulty: { type: String, required: true, enum: ['Easy', 'Medium', 'Hard'] },
   problemUrl: { type: String, required: true },
