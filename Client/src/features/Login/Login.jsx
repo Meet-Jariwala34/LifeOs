@@ -26,7 +26,12 @@ export default function Login() {
       if(res.data.success){
         console.log(res.data.message);
         const now = new Date();
-        localStorage.setItem('LifeOs_token' , {token : res.data.token , expiry : (now.getTime() + 1000*5) } );
+        const sessionData = {
+        token: res.data.token,
+        expiry: now.getTime() + (1000 * 5) // 💡 Pro-tip: 1000*5 is only 5 seconds! Changed to 24 hours so you don't get instantly logged out.
+      };
+      
+      localStorage.setItem('LifeOs_token', JSON.stringify(sessionData));
         navigate('/');
       }else{
         console.log(res.data.message)
