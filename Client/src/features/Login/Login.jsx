@@ -26,7 +26,7 @@ export default function Login() {
       if(res.data.success){
         console.log(res.data.message);
         const now = new Date();
-        localStorage.setItem('LifeOs_token' , {token : res.data.token , expiry : (now.getTime() + 100*60*60*8) } );
+        localStorage.setItem('LifeOs_token' , {token : res.data.token , expiry : (now.getTime() + 1000*5) } );
         navigate('/');
       }else{
         console.log(res.data.message)
