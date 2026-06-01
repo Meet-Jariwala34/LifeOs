@@ -17,6 +17,7 @@ export default function App() {
   useEffect(()=>{
     const token = localStorage.getItem('LifeOs_token');
     const now = new Date();
+    console.log(token.expiry);
     if(!token || now.getTime() > token.expiry){
       toast.error("You are not logged in !!");
       navigate("/login");
