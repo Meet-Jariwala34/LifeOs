@@ -20,26 +20,29 @@ export default function Login() {
     }
   };
 
-  const handleOnLogin = async () => {
-    try {
-      const res = await axios.post(import.meta.env.VITE_API_BACKEND_URL + "/auth/login", {password : password})
-      if(res.data.success){
-        console.log(res.data.message);
-        const now = new Date();
-        const sessionData = {
+ const handleOnLogin = async () => {
+  try {
+    const res = await axios.post(import.meta.env.VITE_API_BACKEND_URL + "/auth/login", { password: password });
+    
+    if (res.data.success) {
+      console.log(res.data.message);
+      const now = new Date();
+      
+      // 🚀 THE FIX: Stringify the object so localStorage can store it safely!
+      const sessionData = {
         token: res.data.token,
-        expiry: now.getTime() + (1000 * 5) // 💡 Pro-tip: 1000*5 is only 5 seconds! Changed to 24 hours so you don't get instantly logged out.
+        expiry: now.getTime() + (1000 * 60 * 60 * 24) // 💡 Pro-tip: 1000*5 is only 5 seconds! Changed to 24 hours so you don't get instantly logged out.
       };
       
       localStorage.setItem('LifeOs_token', JSON.stringify(sessionData));
-        navigate('/');
-      }else{
-        console.log(res.data.message)
-      }
-    } catch (error) {
-      console.log("The error from handle login, Error : "+ error);
+      navigate('/');
+    } else {
+      console.log(res.data.message);
     }
+  } catch (error) {
+    console.log("The error from handle login, Error: " + error);
   }
+};
 
   return (
     <div id='login-background' className='relative flex h-screen w-screen items-center justify-center overflow-hidden transition-all duration-1000'>
