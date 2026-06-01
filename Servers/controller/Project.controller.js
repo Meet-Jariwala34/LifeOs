@@ -1,6 +1,7 @@
 // backend/controllers/projectController.js
 const Project = require('../model/Project');
 const axios = require('axios');
+const {autoTriggerContentTask}  = require('../utils/contentTrigger');
 
 // Fetch all project cards with aggregated completeness percentages
 exports.getAllProjects = async (req, res) => {
@@ -48,7 +49,7 @@ exports.addProjectWithAI = async (req, res) => {
       modules: []
     });
 
-    const N8N_WEBHOOK_URL = 'https://meetjariwala34.app.n8n.cloud/webhook-test/LifeOs_architecture';
+    const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL_PROJECT || 'http://localhost:5678/webhook-test/LifeOs_architecture';
 
     try {
       // 2. Send the project payload data to n8n and wait for the Gemini output
@@ -112,12 +113,124 @@ exports.toggleStepCompletion = async (req, res) => {
     const targetStep = targetModule.steps.id(stepId);
     if (!targetStep) return res.status(404).json({ success: false, message: 'Checklist step unlocated' });
 
+    // Apply the checked value change state
     targetStep.isCompleted = isCompleted;
     project.updatedAt = Date.now();
 
+    // 🎯 CRITICAL REFACTOR: Save updates to the database!
     await project.save();
+
+    // 🚀 AUTOMATION CROSS-SYNC HOOK TRIGGER:
+    // If you explicitly check a box off to true, fire the background creator hook!
+    if (isCompleted === true || isCompleted === 'true') {
+      // Passes: Feature/Step Name (e.g. "Setup Redis Caching"), Category, Parent Project Name (e.g. "PageFlow")
+      await autoTriggerContentTask(
+        targetStep.name || targetStep.title || 'Subfeature Block', 
+        'Project', 
+        project.title
+      );
+    }
+
     return res.status(200).json({ success: true, data: project });
   } catch (error) {
+    console.error("❌ Toggle step automation cross-sync failed:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.saveToDb = async (req, res) => {
+  try {
+    let { title, description, techStack, modules } = req.body;
+
+    if (!title) {
+      return res.status(400).json({ success: false, message: "Missing required project title identifier." });
+    }
+
+    // 1. Unpack stringified payloads if passed from n8n
+    if (typeof modules === 'string') {
+      try { modules = JSON.parse(modules); } catch (e) { console.error(e); }
+    }
+    if (typeof techStack === 'string') {
+      try { techStack = JSON.parse(techStack); } catch (e) { console.error(e); }
+    }
+
+    // 2. Wrap lone objects into explicit arrays
+    if (modules && typeof modules === 'object' && !Array.isArray(modules)) {
+      modules = [modules];
+    }
+    if (techStack && typeof techStack === 'object' && !Array.isArray(techStack)) {
+      techStack = [techStack];
+    }
+
+    const rawModules = [modules].flat().filter(Boolean);
+    const cleanTechStack = [techStack].flat().filter(Boolean).map(t => String(t));
+
+    // 🎯 3. DATA NORMALIZATION LAYER: Map Gemini outputs into your exact Schema Tiers
+    const cleanModules = rawModules.map(mod => {
+      // Map 'moduleTitle' to 'title' safely
+      const moduleTitle = mod.title || mod.moduleTitle || 'Unnamed Feature Component';
+      
+      // Transform plain string steps into array objects [{ text: '...' }]
+      let rawSteps = mod.steps || [];
+      if (typeof rawSteps === 'string') rawSteps = [rawSteps];
+      
+      const cleanSteps = rawSteps.map(step => {
+        if (typeof step === 'object' && step !== null) {
+          return {
+            text: step.text || step.name || JSON.stringify(step),
+            isCompleted: typeof step.isCompleted === 'boolean' ? step.isCompleted : false
+          };
+        }
+        // If it's a raw text string, transform it into a proper sub-document shape
+        return { text: String(step), isCompleted: false };
+      });
+
+      // Format resources link strings safely into [{ label, url }] shapes if present
+      let cleanResources = [];
+      if (typeof mod.resources === 'string') {
+        cleanResources = mod.resources.split(',').map(link => ({
+          label: 'Documentation',
+          url: link.trim()
+        }));
+      } else if (Array.isArray(mod.resources)) {
+        cleanResources = mod.resources.map(r => ({
+          label: typeof r === 'object' ? r.label || 'Resource' : 'Resource',
+          url: typeof r === 'object' ? r.url || String(r) : String(r)
+        }));
+      }
+
+      return {
+        title: moduleTitle,
+        techStack: Array.isArray(mod.techStack) ? mod.techStack.map(t => String(t)) : [],
+        steps: cleanSteps,
+        resources: cleanResources
+      };
+    });
+
+    console.log(`⚙️ Schema Enforcer Normalized: ${cleanModules.length} modules matched to structural tiers.`);
+
+    // 4. Upsert your fully-sanitized blueprint document into Atlas
+    const updatedProject = await Project.findOneAndUpdate(
+      { title: title.trim() },
+      {
+        title: title.trim(),
+        description: description || '',
+        techStack: cleanTechStack,
+        modules: cleanModules,
+        updatedAt: new Date()
+      },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    console.log(`📥 Project Database Sync: Successfully staged blueprint metrics for "${updatedProject.title}"`);
+    return res.status(200).json({
+      success: true,
+      message: "Project blueprint indexed perfectly in MongoDB Atlas.",
+      data: updatedProject
+    });
+
+  } catch (error) {
+    console.error("❌ Mongoose validation dropped the write pass:", error.message);
     return res.status(500).json({ success: false, message: error.message });
   }
 };

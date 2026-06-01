@@ -1,18 +1,81 @@
 // backend/controllers/dsaController.js
 const dsaList = require('../constants/blind75.json');
 const DsaProblem = require('../model/DSA');
+const { autoTriggerContentTask } = require('../utils/contentTrigger');
 
 // TIME INTERVAL MATRIX (Index matches the revisionStage rank value)
 const INTERVAL_DAYS_MAP = [0, 2, 7, 15, 45];
 
+// @desc    Calculate and update the Spaced Repetition timeline snapshot values
+// @route   POST /api/dsa/updateStatus
+exports.updateProblemStatus = async (req, res) => {
+  try {
+    const { title, topic, difficulty, problemUrl, action } = req.body; 
+
+    if (!title) {
+      return res.status(400).json({ success: false, message: "Required parameter 'title' is missing." });
+    }
+    
+    // Find existing tracking entry document or fall back to an empty defaults object
+    const existingRecord = await DsaProblem.findOne({ title }) || { revisionStage: 0 };
+
+    let nextStage = existingRecord.revisionStage;
+    let daysToAdd = 0;
+
+    if (action === 'PASSED') {
+      // Advance to the next spaced interval stage level up to stage 5 (Complete Mastery)
+      nextStage = Math.min(nextStage + 1, 5);
+      daysToAdd = INTERVAL_DAYS_MAP[nextStage] || 0;
+    } else if (action === 'FAILED') {
+      // Break sequence: Drop interval stage back down to Day 2 review loop path parameters
+      nextStage = 1;
+      daysToAdd = INTERVAL_DAYS_MAP[1]; 
+    }
+
+    // Calculate future timestamp target date
+    const calculatedReleaseDate = new Date();
+    calculatedReleaseDate.setDate(calculatedReleaseDate.getDate() + daysToAdd);
+
+    const updatedProblem = await DsaProblem.findOneAndUpdate(
+      { title },
+      {
+        title,
+        topic,
+        difficulty,
+        problemUrl,
+        revisionStage: nextStage,
+        nextVisibleRevisionDate: nextStage === 5 ? null : calculatedReleaseDate,
+        lastSolvedAt: new Date() // Stores clean ISO Date object for correct daily sync matching
+      },
+      { returnDocument: 'after', upsert: true }
+    );
+
+    // 🚀 AUTOMATION CROSS-SYNC TRIGGER CHECK:
+    // If you passed the problem, fire the background sync hook to spawn an ideation card!
+    if (action === 'PASSED') {
+      console.log(`🎯 DSA Milestone complete! Spawning content card for: ${title}`);
+      await autoTriggerContentTask(title, 'DSA');
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: action === 'PASSED' ? `Advanced to Stage ${nextStage}. Review in ${daysToAdd} days.` : 'Reset to Stage 1. Review in 2 days.',
+      data: updatedProblem
+    });
+  } catch (error) {
+    console.error("❌ Status update write failed:", error.message);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get current daily deck sequentially following the exact NeetCode curriculum
-// @route   GET /api/dsa/daily-deck
+// @route   GET /api/dsa/getDeck
 exports.getDailyDeck = async (req, res) => {
   try {
     const { forceRefresh } = req.query;
     const now = new Date();
     
-    // ⏰ Calculate Today's 6:00 AM local rollover boundary anchor target
+    // Calculate Today's 6:00 AM local rollover boundary anchor target
     const resetBoundary = new Date();
     resetBoundary.setHours(6, 0, 0, 0);
     if (now < resetBoundary) {
@@ -31,7 +94,6 @@ exports.getDailyDeck = async (req, res) => {
       const lockedUntilFutureTitles = new Set();
       const activeDeckTitlesToExclude = new Set();
 
-      // If forcing a fresh set, ensure we skip the questions currently on screen
       if (forceRefresh === 'true' && dailyDeckItems.length > 0) {
         dailyDeckItems.forEach(item => activeDeckTitlesToExclude.add(item.title));
       }
@@ -70,7 +132,6 @@ exports.getDailyDeck = async (req, res) => {
 
       // Save or update these final 5 items into MongoDB to lock them for today
       dailyDeckItems = await Promise.all(selectedBatch.map(async (prob) => {
-        // We look up if this item already has a record to preserve its revision stage status
         const existing = trackedProblems.find(t => t.title === prob.title);
         
         const doc = await DsaProblem.findOneAndUpdate(
@@ -82,8 +143,6 @@ exports.getDailyDeck = async (req, res) => {
             topic: prob.topicTag || prob.topic, 
             problemUrl: prob.problemUrl,
             patternType: prob.patternType,
-            // If it's a completely fresh seed item, update lastSolvedAt to lock it into today's frame.
-            // If it's an existing review item, leave its lastSolvedAt alone until they click a button!
             lastSolvedAt: existing && existing.revisionStage > 0 ? existing.lastSolvedAt : new Date(),
             $setOnInsert: { revisionStage: 0 } 
           },
@@ -97,7 +156,6 @@ exports.getDailyDeck = async (req, res) => {
     const activeDailyDeck = dailyDeckItems.map(p => {
       const cleanDoc = p._doc || p; 
       
-      // Look up the live model status to see if it was modified inside today's reset boundary
       const liveRecord = trackedProblems.find(t => t.title === cleanDoc.title) || cleanDoc;
       const hasBeenSolvedToday = liveRecord.lastSolvedAt && new Date(liveRecord.lastSolvedAt) >= resetBoundary;
 
@@ -110,19 +168,16 @@ exports.getDailyDeck = async (req, res) => {
         topicTag: cleanDoc.topic, 
         patternType: cleanDoc.patternType,
         revisionStage: liveRecord.revisionStage || 0,
-        // 🎯 STATUS LOGIC: It only displays as 'Revision' if it has been touched since 6:00 AM today!
         status: (liveRecord.revisionStage > 0 && hasBeenSolvedToday) ? 'Revision' : 'Untouched'
       };
     });
 
-    // 4. 💎 FIXED PROGRESS CALCULATION
-    // Count how many items in your current active 5-deck array have been solved today
     const solvedTodayCount = activeDailyDeck.filter(p => p.status === 'Revision').length;
 
     return res.status(200).json({
       success: true,
       data: activeDailyDeck,
-      solvedTodayCount: solvedTodayCount // Smoothly updates your "X / 5 Solved" gauge!
+      solvedTodayCount: solvedTodayCount 
     });
 
   } catch (error) {
@@ -131,125 +186,10 @@ exports.getDailyDeck = async (req, res) => {
   }
 };
 
-// @desc    Calculate and update the Spaced Repetition timeline snapshot values
-// @route   POST /api/dsa/updateStatus
-exports.updateProblemStatus = async (req, res) => {
-  try {
-    const { title, topic, difficulty, problemUrl, action } = req.body; 
-    
-    // Find existing tracking entry document or fall back to an empty defaults object
-    const existingRecord = await DsaProblem.findOne({ title }) || { revisionStage: 0 };
-
-    let nextStage = existingRecord.revisionStage;
-    let daysToAdd = 0;
-
-    if (action === 'PASSED') {
-      // Advance to the next spaced interval stage level up to stage 5 (Complete Mastery)
-      nextStage = Math.min(nextStage + 1, 5);
-      daysToAdd = INTERVAL_DAYS_MAP[nextStage] || 0;
-    } else if (action === 'FAILED') {
-      // Break sequence: Drop interval stage back down to Day 2 review loop path parameters
-      nextStage = 1;
-      daysToAdd = INTERVAL_DAYS_MAP[1]; 
-    }
-
-    // Calculate future timestamp target date
-    const calculatedReleaseDate = new Date();
-    calculatedReleaseDate.setDate(calculatedReleaseDate.getDate() + daysToAdd);
-
-    const updatedProblem = await DsaProblem.findOneAndUpdate(
-      { title },
-      {
-        title,
-        topic,
-        difficulty,
-        problemUrl,
-        revisionStage: nextStage,
-        nextVisibleRevisionDate: nextStage === 5 ? null : calculatedReleaseDate,
-        lastSolvedAt: new Date() // 🎯 FIXED: Stores clean ISO Date object for correct daily sync matching
-      },
-      { returnDocument: 'after', upsert: true }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: action === 'PASSED' ? `Advanced to Stage ${nextStage}. Review in ${daysToAdd} days.` : 'Reset to Stage 1. Review in 2 days.',
-      data: updatedProblem
-    });
-  } catch (error) {
-    console.error("❌ Status update write failed:", error.message);
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
+// @desc    Fetch completed history items
+// @route   GET /api/dsa/history
 exports.getProblemHistory = async (req, res) => {
   try {
-    const history = await DsaProblem.find({ revisionStage: { $gt: 0 } })
-                                    .sort({ lastSolvedAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      count: history.length,
-      data: history
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// @desc    Calculate and update the Spaced Repetition timeline snapshot values
-// @route   POST /api/dsa/update-state
-exports.updateProblemStatus = async (req, res) => {
-  try {
-    const { title, topic, difficulty, problemUrl, action } = req.body; // action expected: 'PASSED' or 'FAILED'
-    
-    // Find existing tracking entry document or fall back to an empty defaults object
-    const existingRecord = await DsaProblem.findOne({ title }) || { revisionStage: 0 };
-
-    let nextStage = existingRecord.revisionStage;
-    let daysToAdd = 0;
-
-    if (action === 'PASSED') {
-      // Advance to the next spaced interval stage level up to stage 5 (Complete Mastery)
-      nextStage = Math.min(nextStage + 1, 5);
-      daysToAdd = INTERVAL_DAYS_MAP[nextStage] || 0;
-    } else if (action === 'FAILED') {
-      // Break sequence: Drop interval stage back down to Day 2 review loop path parameters
-      nextStage = 1;
-      daysToAdd = INTERVAL_DAYS_MAP[1]; 
-    }
-
-    // Calculate future timestamp target date
-    const calculatedReleaseDate = new Date();
-    calculatedReleaseDate.setDate(calculatedReleaseDate.getDate() + daysToAdd);
-
-    const updatedProblem = await DsaProblem.findOneAndUpdate(
-      { title },
-      {
-        title,
-        topic,
-        difficulty,
-        problemUrl,
-        revisionStage: nextStage,
-        nextVisibleRevisionDate: nextStage === 5 ? null : calculatedReleaseDate, // Setting to null preserves the database record while removing it from future deck queries entirely
-        lastSolvedAt: Date.now()
-      },
-      { new: true, upsert: true }
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: action === 'PASSED' ? `Advanced to Stage ${nextStage}. Review in ${daysToAdd} days.` : 'Reset to Stage 1. Review in 2 days.',
-      data: updatedProblem
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-exports.getProblemHistory = async (req, res) => {
-  try {
-    // Fetch all records, sorting by the last time they were manipulated/solved
     const history = await DsaProblem.find({ revisionStage: { $gt: 0 } })
                                     .sort({ lastSolvedAt: -1 });
 
