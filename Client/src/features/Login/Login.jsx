@@ -22,7 +22,7 @@ export default function Login() {
 
   const handleOnLogin = async () => {
     try {
-      const res = await axios.post("http://localhost:5000/api/auth/login", {password : password})
+      const res = await axios.post(import.meta.env.VITE_API_BACKEND_URL + "/auth/login", {password : password})
       if(res.data.success){
         console.log(res.data.message);
         const now = new Date();
