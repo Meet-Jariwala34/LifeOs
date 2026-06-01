@@ -14,18 +14,35 @@ export default function App() {
   const [authenticate , isAuthenticate] = useState(false);
   
 
-  useEffect(()=>{
-    const token = localStorage.getItem('LifeOs_token');
-    const now = new Date();
-    const session = JSON.parse(token);
+  useEffect(() => {
+  const rawData = localStorage.getItem('LifeOs_token');
+  const now = new Date();
+
+  // If nothing exists in storage, boot straight to login
+  if (!rawData) {
+    toast.error("You are not logged in !!");
+    navigate("/login");
+    return;
+  }
+
+  // 🚀 THE FIX: Parse the raw string back into a working object
+  try {
+    const session = JSON.parse(rawData);
     console.log("Session Expiry Time:", session.expiry);
-    if(!token || now.getTime() > session.expiry){
-      toast.error("You are not logged in !!");
+
+    if (now.getTime() > session.expiry) {
+      toast.error("Session expired! Please log in again.");
+      localStorage.removeItem('LifeOs_token'); // Clean up stale data
       navigate("/login");
-    }else{
-      toast.success("You are logged in .. ")
+    } else {
+      toast.success("Welcome back! Synchronized.");
     }
-  }, []);
+  } catch (err) {
+    console.error("Corrupted session token string data cleared:", err);
+    localStorage.removeItem('LifeOs_token');
+    navigate("/login");
+  }
+}, []);
 
   return (
     <div className='h-screen w-screen flex justify-center items-center'>
