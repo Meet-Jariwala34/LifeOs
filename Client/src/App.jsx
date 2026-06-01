@@ -17,7 +17,7 @@ export default function App() {
   useEffect(()=>{
     const token = localStorage.getItem('LifeOs_token');
     const now = new Date();
-    const session = JSON.parse(rawData);
+    const session = JSON.parse(token);
     console.log("Session Expiry Time:", session.expiry);
     if(!token || now.getTime() > session.expiry){
       toast.error("You are not logged in !!");
