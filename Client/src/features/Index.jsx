@@ -6,6 +6,7 @@ import DSA from './DSA/DSA';
 import Project from './Project/Project';
 import Content from './Content/Content';
 import Add from './Add/AddSection'
+import GYM from './Body/BodySection'
 import { NavigationProvider, useNavigation } from '../contexts/NavigationContext'
 
 export default function Index() {
@@ -22,7 +23,7 @@ export default function Index() {
         { activeTab == "project" ? <Project/> : <></> }
         { activeTab == "content" ? <Content/> : <></> }
         { activeTab == "add" ? <Add/> : <></> }
-        
+        { activeTab == "gym" ? <GYM/> : <></> }
     </div>
   )
 }

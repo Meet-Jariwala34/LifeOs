@@ -4,6 +4,7 @@ const auth = require('./routes/login');
 const dsa = require('./routes/dsa');
 const project = require('./routes/project');
 const content = require('./routes/content');
+const body = require('./routes/body');
 
 const app = express();
 const allowedOrigins = [
@@ -34,6 +35,7 @@ app.use("/api/dsa",dsa);
 app.use('/api/projects', project);
 app.use('/api/content',content);
 app.use('/api/task', project);
+app.use('/api/body',body);
 
 app.get('/api/ready', (req, res) => {
   res.json({ message: "Hello World !!" });

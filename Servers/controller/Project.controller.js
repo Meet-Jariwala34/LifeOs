@@ -3,6 +3,7 @@ const Project = require('../model/Project');
 const DSA = require('../model/DSA');
 const Task = require('../model/Task');
 const contetModel = require('../model/Content');
+const BodyLog = require('../model/BodyLog');
 const axios = require('axios');
 const {autoTriggerContentTask}  = require('../utils/contentTrigger');
 
@@ -434,6 +435,9 @@ exports.getDailySummary = async (req, res) => {
             updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
         });
 
+        const todayISTString = startOfTargetDay.toISOString().split('T')[0];
+        const targetBodyTelemetry = await BodyLog.findOne({ date: todayISTString });
+
         // 6. Return the fully loaded, zero-free telemetry block to n8n
         return res.status(200).json({
             success: true,
@@ -448,7 +452,9 @@ exports.getDailySummary = async (req, res) => {
                 
                 // 🟩 Fresh active variables passed down the stream:
                 projectDeltaPoints: projectProgressPoints, 
-                contentStagedCount: contentStagedYesterday.length 
+                contentStagedCount: contentStagedYesterday.length,
+                dailyCaloriesScore: targetBodyTelemetry ? targetBodyTelemetry.totalCaloriesIntake : 0,
+                dailyProteinScore: targetBodyTelemetry ? targetBodyTelemetry.totalProteinIntake : 0
             }
         });
 

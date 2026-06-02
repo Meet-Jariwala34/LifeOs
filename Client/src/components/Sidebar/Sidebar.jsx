@@ -4,7 +4,8 @@ import {
   CodeRegular, 
   BriefcaseRegular, // Commonly used for "Project"
   ListRegular, 
-  AddFilled 
+  AddFilled ,
+  PersonRegular
 } from '@fluentui/react-icons';
 import { useNavigation } from '../../contexts/NavigationContext';
 
@@ -27,6 +28,7 @@ export default function Sidebar({currentTab}) {
         <div onClick={()=> setActiveTab("project")} className={`h-auto w-full p-3 pl-10 text-white cursor-pointer ${currentTab == "project" ? "bg-[#2a2c2c] border-r-2 border-r-white" : ""}`}><BriefcaseRegular/>&nbsp;Project</div>
         <div onClick={()=> setActiveTab("content")} className={`h-auto w-full p-3 pl-10 text-white cursor-pointer ${currentTab == "content" ? "bg-[#2a2c2c] border-r-2 border-r-white" : ""}`}><ListRegular/>&nbsp;Content</div>
         <div onClick={()=> setActiveTab("add")} className={`h-auto w-full p-3 pl-10 text-white cursor-pointer ${currentTab == "setting" ? "bg-[#2a2c2c] border-r-2 border-r-white" : ""}`}><AddFilled />&nbsp;Add</div>
+        <div onClick={()=> setActiveTab("gym")} className={`h-auto w-full p-3 pl-10 text-white cursor-pointer ${currentTab == "setting" ? "bg-[#2a2c2c] border-r-2 border-r-white" : ""}`}><PersonRegular />&nbsp;GYM</div>
       </div>
     </div>
   )
