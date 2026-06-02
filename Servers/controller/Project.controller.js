@@ -456,4 +456,5 @@ exports.getDailySummary = async (req, res) => {
         console.error("Failed to generate complete telemetry overview arrays:", error.message);
         return res.status(500).json({ success: false, error: error.message });
     }
-};
+}
+
