@@ -1,6 +1,8 @@
 // backend/controllers/projectController.js
 const Project = require('../model/Project');
+const DSA = require('../model/DSA');
 const Task = require('../model/Task');
+const contetModel = require('../model/Content');
 const axios = require('axios');
 const {autoTriggerContentTask}  = require('../utils/contentTrigger');
 
@@ -375,5 +377,83 @@ exports.toggleTaskStep = async (req, res) => {
             message: "Failed to modify checkbox state inside database layer.",
             error: error.message
         });
+    }
+};
+
+exports.getDailySummary = async (req, res) => {
+    try {
+        // 1. Establish the time boundary for "Yesterday" (The day that just ended)
+        const startOfTargetDay = new Date();
+        startOfTargetDay.setDate(startOfTargetDay.getDate() - 1);
+        startOfTargetDay.setHours(0, 0, 0, 0);
+
+        const endOfTargetDay = new Date();
+        endOfTargetDay.setDate(endOfTargetDay.getDate() - 1);
+        endOfTargetDay.setHours(23, 59, 59, 999);
+
+        // 2. Query basic task completions
+        const completedTasksToday = await Task.find({
+            status: 'completed',
+            updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
+        });
+        const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
+
+        // 3. Query DSA completions
+        const dsaSolvedTodayList = await DSA.find({
+            status: 'Completed', 
+            updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
+        });
+
+        // 4. 🔥 DYNAMIC PROJECT PROGRESS CALCULATOR
+        // We look up all active projects and check how many tier-3 steps were checked off yesterday!
+        const activeProjects = await Project.find();
+        let projectProgressPoints = 0;
+
+        activeProjects.forEach(project => {
+            if (project.modules) {
+                project.modules.forEach(mod => {
+                    if (mod.steps) {
+                        // Count steps inside modules that were marked completed yesterday
+                        const stepsDoneYesterday = mod.steps.filter(step => 
+                            step.isCompleted === true && 
+                            step.updatedAt >= startOfTargetDay && 
+                            step.updatedAt <= endOfTargetDay
+                        ).length;
+                        
+                        // Every individual development checklist step completed = 1 Point!
+                        projectProgressPoints += stepsDoneYesterday;
+                    }
+                });
+            }
+        });
+
+        // 5. 🔥 DYNAMIC CONTENT PRODUCTION CALCULATOR
+        // Check your content studio queue collection for tracks staged or released yesterday
+        const contentStagedYesterday = await contetModel.find({
+            status: 'Staged',
+            updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
+        });
+
+        // 6. Return the fully loaded, zero-free telemetry block to n8n
+        return res.status(200).json({
+            success: true,
+            telemetry: {
+                date: startOfTargetDay.toISOString().split('T')[0], 
+                tasksCompletedCount: completedTasksToday.length,
+                completedTaskTitles: completedTasksToday.map(t => t.title),
+                remainingActiveTasks: activeTasksCount,
+                totalActiveProjects: activeProjects.length,
+                dsaSolvedCount: dsaSolvedTodayList.length,
+                dsaProblemTitles: dsaSolvedTodayList.map(p => p.title),
+                
+                // 🟩 Fresh active variables passed down the stream:
+                projectDeltaPoints: projectProgressPoints, 
+                contentStagedCount: contentStagedYesterday.length 
+            }
+        });
+
+    } catch (error) {
+        console.error("Failed to generate complete telemetry overview arrays:", error.message);
+        return res.status(500).json({ success: false, error: error.message });
     }
 };

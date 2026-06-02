@@ -1,7 +1,7 @@
 // backend/routes/projectRoutes.js
 const express = require('express');
 const router = express.Router();
-const { getAllProjects, addProjectWithAI, toggleStepCompletion , saveToDb, triggerAIBlueprint, createAITask, getAllTasks, toggleTaskStep} = require('../controller/Project.controller');
+const { getAllProjects, addProjectWithAI, toggleStepCompletion , saveToDb, triggerAIBlueprint, createAITask, getAllTasks, toggleTaskStep, getDailySummary} = require('../controller/Project.controller');
 
 router.get('/all', getAllProjects);
 router.post('/add', addProjectWithAI);
@@ -13,5 +13,8 @@ router.post('/input', triggerAIBlueprint);
 router.post('/create', createAITask);
 router.get('/allTask', getAllTasks);
 router.patch('/toggle-step', toggleTaskStep);
+
+//get all data
+router.get('/daily-summary', getDailySummary);
 
 module.exports = router;
