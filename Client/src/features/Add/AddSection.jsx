@@ -246,13 +246,9 @@ const AddSection = () => {
             <div className={`fixed top-0 right-0 bottom-0 w-full sm:w-[380px] bg-zinc-900 border-l border-zinc-800 z-40 p-6 shadow-2xl flex flex-col justify-between transform transition-transform duration-300 ease-in-out ${
                 isSidebarOpen && selectedTask ? 'translate-x-0' : 'translate-x-full'
             }`}>
-                <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-purple-500/20 via-transparent to-transparent" />
+            <div className="absolute top-0 left-0 bottom-0 w-[1px] bg-gradient-to-b from-purple-500/20 via-transparent to-transparent" />
                 
-<<<<<<< HEAD
-                <div >
-=======
-                <div className='overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden'>
->>>>>>> ec93177b7c297dacb13de2cebf1b5ad09c59215c
+                <div className="overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                     {/* Sidebar Header Panel */}
                     <div className="flex items-start justify-between gap-4 border-b border-zinc-850 pb-4 mb-6 mt-12 sm:mt-4">
                         <div>
