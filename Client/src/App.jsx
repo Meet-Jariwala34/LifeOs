@@ -5,6 +5,7 @@ import Home from './features/Home/Home'
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import Index from './features/Index';
+import NotFound from './error/NotFound';
 import {NavigationProvider} from './contexts/NavigationContext'
 
 
@@ -51,7 +52,8 @@ export default function App() {
         !authenticate ? <Routes>
           <Route path='/login' element={<Login/>}></Route>
           <Route path='/' element={<Index/>}></Route>
-        </Routes> : <Routes><Route path='/' element={<Index/>}></Route></Routes>
+          <Route path="*" element={<NotFound />} />
+        </Routes> : <Routes><Route path='/' element={<Index/>}></Route><Route path="*" element={<NotFound />} /></Routes>
       }
       </NavigationProvider>
     </div>

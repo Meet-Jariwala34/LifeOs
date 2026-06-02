@@ -41,5 +41,28 @@ app.get('/api/ready', (req, res) => {
   res.json({ message: "Hello World !!" });
 });
 
+//ERROR HANDLING 
+// --- PLACE THIS AFTER ALL YOUR VALID API ROUTES ---
+
+// 1. Catch-All for Unhandled API Routes (404 Not Found)
+app.use((req, res, next) => {
+  const error = new Error(`Route Not Found - ${req.originalUrl}`);
+  res.status(404);
+  next(error);
+});
+
+// 2. Global Exception Handler Middleware (500 Server Error)
+app.use((err, req, res, next) => {
+  // If status code is still 200, default it to a 500 server error
+  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  
+  res.status(statusCode).json({
+    success: false,
+    message: err.message,
+    // Only show error stack traces in development mode to keep production secure
+    stack: process.env.NODE_ENV === 'production' ? null : err.stack,
+  });
+});
+
 // Export the configured app instance
 module.exports = app;
