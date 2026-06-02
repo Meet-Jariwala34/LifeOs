@@ -31,3 +31,64 @@
     box-shadow: 1px 1px 2px white;
     border : 1px solid white;
 }
+
+.dropdown-wrapper {
+  width: 256px; /* Equivalent to w-64 */
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.dropdown-label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827; /* Dark gray */
+}
+
+.select-container {
+  position: relative;
+  width: 100%;
+}
+
+select {
+  /* CRITICAL: Removes default browser styling and arrow */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  
+  display: block;
+  width: 100%;
+  padding: 10px 40px 10px 16px; /* Extra right padding so text doesn't hit the arrow */
+  font-size: 14px;
+  color: #ffffff;
+  background-color: #161619;
+  border: 1px solid #d1d5db; /* Light gray border */
+  border-radius: 8px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  /* Injecting a custom SVG chevron arrow via background image */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://w3.org' fill='none' viewBox='0 0 24 24' stroke='%236b7280' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 20px;
+}
+
+/* Interactive States */
+select:hover {
+  border-color: #9ca3af; /* Slightly darker border on hover */
+}
+
+select:focus {
+  outline: none;
+  border-color: #3b82f6; /* Blue border */
+  box-shadow: 0 0 0 1px #3b82f6; /* Blue ring effect */
+}
+
+/* Optional styling for the dropdown choices overlay */
+select option {
+  color: #ffffff;
+  background-color: #161619;
+  border-radius: 1rem;
+}
