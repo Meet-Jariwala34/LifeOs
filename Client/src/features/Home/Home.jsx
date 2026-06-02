@@ -4,14 +4,16 @@ import API from '../../services/api';
 import { 
   BoardRegular, AccessTimeRegular, CodeRegular, 
   VideoClipRegular, CheckmarkCircleRegular, FlashRegular,
-  PulseRegular, ArrowClockwiseRegular, OpenRegular
+  PulseRegular, ArrowClockwiseRegular, OpenRegular,
+  CheckmarkSquareRegular
 } from '@fluentui/react-icons';
 
 export default function DashboardOverview() {
-  const [metrics, setMetrics] = useState({ dsaSolvedToday: 0, activeProjects: 0, pendingContent: 0 });
+  const [metrics, setMetrics] = useState({ dsaSolvedToday: 0, activeProjects: 0, pendingContent: 0, activeTasksCount: 0 });
   const [dsaDeck, setDsaDeck] = useState([]);
   const [projects, setProjects] = useState([]);
   const [contentTasks, setContentTasks] = useState([]);
+  const [aiTasks, setAiTasks] = useState([]); // 🟩 Track the new standalone Tasks collection
   const [loading, setLoading] = useState(true);
   const [isServerOnline, setIsServerOnline] = useState(true);
 
@@ -26,10 +28,12 @@ export default function DashboardOverview() {
 
   const fetchDashboardOverviewData = async () => {
     try {
-      const [dsaRes, projectRes, contentRes] = await Promise.all([
+      // 📡 Execute all collection reads concurrently across data nodes
+      const [dsaRes, projectRes, contentRes, taskRes] = await Promise.all([
         API.get('/dsa/getDeck'),
         API.get('/projects/all'),
-        API.get('/content/active')
+        API.get('/content/active'),
+        API.get('/task/allTask') // 🟩 Hit your new clean endpoint
       ]);
 
       if (dsaRes.data.success) {
@@ -43,6 +47,12 @@ export default function DashboardOverview() {
       if (contentRes.data.success) {
         setContentTasks(contentRes.data.data.slice(0, 3)); 
         setMetrics(prev => ({ ...prev, pendingContent: contentRes.data.data.length }));
+      }
+      if (taskRes.data.success) {
+        // Filter out completed tasks so only active roadmaps are showing
+        const activeBlueprints = (taskRes.data.data || []).filter(t => t.status !== 'completed');
+        setAiTasks(activeBlueprints.slice(0, 3)); // Slice top 3 items for display density
+        setMetrics(prev => ({ ...prev, activeTasksCount: activeBlueprints.length }));
       }
     } catch (err) {
       console.error("Dashboard engine link dropped:", err);
@@ -110,17 +120,17 @@ export default function DashboardOverview() {
           </div>
           <div className="rounded-xl border border-zinc-900 bg-[#131313] p-5 flex items-center justify-between">
             <div className="text-left space-y-1">
-              <p className="text-[9px] font-mono uppercase text-zinc-500 tracking-wider">Active Blueprints</p>
+              <p className="text-[9px] font-mono uppercase text-zinc-500 tracking-wider">Architecture Pipeline</p>
               <p className="text-2xl font-bold font-mono text-white">{metrics.activeProjects}</p>
             </div>
-            <FlashRegular className="text-2xl text-emerald-400" />
+            <FlashRegular className="text-2xl text-purple-400" />
           </div>
           <div className="rounded-xl border border-zinc-900 bg-[#131313] p-5 flex items-center justify-between">
             <div className="text-left space-y-1">
-              <p className="text-[9px] font-mono uppercase text-zinc-500 tracking-wider">Active Studio Tracks</p>
-              <p className="text-2xl font-bold font-mono text-white">{metrics.pendingContent}</p>
+              <p className="text-[9px] font-mono uppercase text-zinc-500 tracking-wider">AI Blueprint Tracks</p>
+              <p className="text-2xl font-bold font-mono text-white">{metrics.activeTasksCount}</p>
             </div>
-            <VideoClipRegular className="text-2xl text-purple-400" />
+            <CheckmarkSquareRegular className="text-2xl text-emerald-400" />
           </div>
           <div className="rounded-xl border border-zinc-900 bg-[#131313] p-5 flex items-center justify-between">
             <div className="text-left space-y-1">
@@ -135,7 +145,11 @@ export default function DashboardOverview() {
 
         {/* WORKSPACE SECTORS ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          
+          {/* LEFT SECTOR COLUMN: REVISION ARRAY & BLUEPRINTS */}
           <div className="space-y-6 flex flex-col justify-between">
+            
+            {/* PANEL 1: DSA QUEUE */}
             <div className="rounded-2xl border border-zinc-900 bg-[#131313] p-6 text-left space-y-4 flex-1">
               <h3 className="text-xs font-bold uppercase font-mono tracking-widest text-zinc-500">Active Spaced Repetition Array</h3>
               <div className="space-y-2.5 pt-1">
@@ -160,6 +174,39 @@ export default function DashboardOverview() {
               </div>
             </div>
 
+            {/* PANEL 2: NEW STANDALONE AI TASK TRACKS */}
+            <div className="rounded-2xl border border-zinc-900 bg-[#131313] p-6 text-left space-y-4 flex-1">
+              <h3 className="text-xs font-bold uppercase font-mono tracking-widest text-zinc-500">Active AI Blueprint Checklists</h3>
+              <div className="space-y-2.5 pt-1">
+                {aiTasks.length === 0 ? (
+                  <div className="p-8 text-center font-mono text-[10px] text-zinc-700 border border-dashed border-zinc-900 rounded-xl bg-zinc-950/20">🛰️ Operational terminal clear. No pending roadmaps.</div>
+                ) : (
+                  aiTasks.map((task, idx) => {
+                    const doneCount = task.steps?.filter(s => s.isCompleted).length || 0;
+                    const totalCount = task.steps?.length || 0;
+                    return (
+                      <div key={task._id || idx} className="flex items-center justify-between p-3.5 rounded-xl border border-zinc-900/60 bg-zinc-950/30 hover:border-zinc-800 transition-all font-mono text-xs">
+                        <div className="flex flex-col space-y-1 truncate max-w-[220px]">
+                          <span className="text-zinc-200 font-sans font-semibold truncate tracking-wide">{task.title}</span>
+                          <span className="text-[10px] text-zinc-500 truncate font-mono">
+                            Sub-steps initialized: {totalCount}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-mono tracking-wider border ${
+                          task.status === 'in-progress' 
+                            ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' 
+                            : 'bg-zinc-950 text-zinc-400 border-zinc-800'
+                        }`}>
+                          {doneCount}/{totalCount} Done
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* PANEL 3: MANIFESTATION RITUAL */}
             <div className="rounded-2xl border border-zinc-900 bg-[#131313] p-6 text-left space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase font-mono tracking-widest text-zinc-500">3-6-9 Dynamic Manifest Ritual</h3>
@@ -173,6 +220,7 @@ export default function DashboardOverview() {
             </div>
           </div>
 
+          {/* RIGHT SECTOR COLUMN: PROGRESS GAUGES & STUDIO TRACKS */}
           <div className="space-y-6">
             <div className="rounded-2xl border border-zinc-900 bg-[#131313] p-6 text-left space-y-5 shadow-xl">
               <h3 className="text-xs font-bold uppercase font-mono tracking-widest text-zinc-500">Architecture Pipeline Gauges</h3>
@@ -197,7 +245,6 @@ export default function DashboardOverview() {
                   contentTasks.map((task) => (
                     <div key={task._id} className="flex items-center justify-between p-3 rounded-xl border border-zinc-900/60 bg-zinc-950/30 text-xs font-mono">
                       <div className="flex items-center space-x-2.5 truncate max-w-[200px]">
-                        {/* 🚀 FIXED REAL-TIME STATUS BADGES AT HOME DECK SCREEN */}
                         <span className={`h-1.5 w-1.5 rounded-full ${task.status === 'Staged' ? 'bg-blue-400 animate-pulse' : 'bg-zinc-600'}`} />
                         <span className="text-zinc-300 font-sans font-medium truncate tracking-wide">{task.title}</span>
                       </div>
@@ -210,6 +257,7 @@ export default function DashboardOverview() {
               </div>
             </div>
           </div>
+          
         </div>
 
       </div>

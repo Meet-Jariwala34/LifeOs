@@ -5,7 +5,7 @@ import Sidebar from '../components/Sidebar/Sidebar'
 import DSA from './DSA/DSA';
 import Project from './Project/Project';
 import Content from './Content/Content';
-import Setting from './Setting/Setting';
+import Add from './Add/AddSection'
 import { NavigationProvider, useNavigation } from '../contexts/NavigationContext'
 
 export default function Index() {
@@ -21,7 +21,7 @@ export default function Index() {
         { activeTab == "dsa" ? <DSA/> : <></> }
         { activeTab == "project" ? <Project/> : <></> }
         { activeTab == "content" ? <Content/> : <></> }
-        { activeTab == "setting" ? <Setting/> : <></> }
+        { activeTab == "add" ? <Add/> : <></> }
         
     </div>
   )

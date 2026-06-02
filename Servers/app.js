@@ -33,6 +33,7 @@ app.use('/api/auth', auth);
 app.use("/api/dsa",dsa);
 app.use('/api/projects', project);
 app.use('/api/content',content);
+app.use('/api/task', project);
 
 app.get('/api/ready', (req, res) => {
   res.json({ message: "Hello World !!" });
