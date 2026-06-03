@@ -385,7 +385,6 @@ exports.getDailySummary = async (req, res) => {
     try {
         // 1. Fetch current real-world calendar date inside India (e.g., "2026-06-04" at 2:00 AM)
         const yesterdayStart = new Date();
-        yesterdayStart.setDate(yesterdayStart.getDate() - 1);
 
         // Clone it so we have two separate instances
         const yesterdayEnd = new Date(yesterdayStart);
