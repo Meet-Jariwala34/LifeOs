@@ -35,6 +35,7 @@ exports.updateProblemStatus = async (req, res) => {
     // Calculate future timestamp target date
     const calculatedReleaseDate = new Date();
     calculatedReleaseDate.setDate(calculatedReleaseDate.getDate() + daysToAdd);
+    calculatedReleaseDate.setHours(0,0,1,0);
 
     const updatedProblem = await DsaProblem.findOneAndUpdate(
       { title },
