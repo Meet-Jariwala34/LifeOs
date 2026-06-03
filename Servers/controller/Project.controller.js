@@ -397,7 +397,7 @@ exports.getDailySummary = async (req, res) => {
         // 5. Fire Core Queries using absolute, pre-casted ISO strings
         const completedTasksToday = await Task.find({
             status: 'completed',
-            updatedAt: {  $lte: yesterdayEnd }
+            updatedAt: { $gte:yesterdayStart,  $lte: yesterdayEnd }
         });
         const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
 
