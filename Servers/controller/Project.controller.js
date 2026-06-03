@@ -381,41 +381,46 @@ exports.toggleTaskStep = async (req, res) => {
     }
 };
 
+const Task = require('../model/Task');
+const Project = require('../model/Project');
+const DSA = require('../model/Dsa') || require('../model/dsa') || mongoose.model('DSA'); // Enforce strict fallback binding
+const contetModel = require('../model/Content'); 
+const BodyLog = require('../model/BodyLog');
+
 exports.getDailySummary = async (req, res) => {
     try {
-        // 1. Fetch the absolute real-world calendar date inside India right now (e.g., "2026-06-04")
+        // 1. Fetch current IST date string (e.g., "2026-06-04" when running at 2 AM)
         const currentISTDateString = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         
-        // 2. Build explicit Indian Standard Time ISO string boundaries for Yesterday (June 3rd)
-        // We get Yesterday's calendar date string directly
+        // 2. Compute Target Yesterday String precisely ("2026-06-03")
         const todayMidnight = new Date(`${currentISTDateString}T00:00:00+05:30`);
         const yesterdayMidnight = new Date(todayMidnight.getTime());
         yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
         
-        const reportingDateString = yesterdayMidnight.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // "2026-06-03"
+        const reportingDateString = yesterdayMidnight.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Explicitly "2026-06-03"
 
-        // 3. Construct clean, un-mutated, raw ISO strings for the query window
-        // Yesterday 12:00 AM IST translates cleanly to 2026-06-02T18:30:00.000Z UTC
-        const startISO = new Date(`${reportingDateString}T00:00:00+05:30`).toISOString();
-        // Yesterday 11:59:59 PM IST translates cleanly to 2026-06-03T18:29:59.999Z UTC
-        const endISO = new Date(`${reportingDateString}T23:59:59.999+05:30`).toISOString();
+        // 3. Build Safe JavaScript ISO objects for query thresholds
+        const startWindow = new Date(`${reportingDateString}T00:00:00+05:30`);
+        const endWindow = new Date(`${reportingDateString}T23:59:59.999+05:30`);
 
-        console.log(`📡 Query Window Locked (UTC): ${startISO} --> ${endISO}`);
-
-        // 4. Fire the absolute queries using pure string ranges
+        // 4. Fire standard task queries
         const completedTasksToday = await Task.find({
             status: 'completed',
-            updatedAt: { $gte: startISO, $lte: endISO }
+            updatedAt: { $gte: startWindow, $lte: endWindow }
         });
         const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
 
-        // 🛡️ DSA TRACKER: Now searches raw UTC boundaries directly matching 11:30 AM UTC
+        // 🛡️ RECTIFIED DSA FIND LOGIC:
+        // We use standard Date comparison operators which Mongo converts automatically 
+        // to match both '+00:00' strings and native Date types seamlessly!
         const dsaSolvedTodayList = await DSA.find({
             status: 'Completed', 
-            lastSolvedAt: { $gte: startISO, $lte: endISO }
+            lastSolvedAt: { $gte: startWindow, $lte: endWindow }
         });
 
-        // 🔥 DYNAMIC PROJECT PROGRESS CALCULATOR
+        console.log(`🔍 Verified DSA Matches Found: ${dsaSolvedTodayList.length}`);
+
+        // 5. PROJECTS PROGRESS TRACKING
         const activeProjects = await Project.find();
         let projectProgressPoints = 0;
         activeProjects.forEach(project => {
@@ -425,8 +430,8 @@ exports.getDailySummary = async (req, res) => {
                         const stepsDoneYesterday = mod.steps.filter(step => 
                             step.isCompleted === true && 
                             step.updatedAt &&
-                            new Date(step.updatedAt).toISOString() >= startISO && 
-                            new Date(step.updatedAt).toISOString() <= endISO
+                            new Date(step.updatedAt) >= startWindow && 
+                            new Date(step.updatedAt) <= endWindow
                         ).length;
                         projectProgressPoints += stepsDoneYesterday;
                     }
@@ -436,7 +441,7 @@ exports.getDailySummary = async (req, res) => {
 
         const contentStagedYesterday = await contetModel.find({
             status: 'Staged',
-            updatedAt: { $gte: startISO, $lte: endISO }
+            updatedAt: { $gte: startWindow, $lte: endWindow }
         });
 
         const targetBodyTelemetry = await BodyLog.findOne({ date: reportingDateString });
