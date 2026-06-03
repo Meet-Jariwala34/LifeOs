@@ -390,13 +390,14 @@ exports.getDailySummary = async (req, res) => {
         const yesterdayEnd = new Date(yesterdayStart);
 
         // 2. Set the boundaries
-        yesterdayStart.setHours(0, 0, 0, 0);        // Yesterday at Midnight
+        yesterdayStart.setHours(0, 0, 0, 0);
+        yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)// Yesterday at Midnight
         yesterdayEnd.setHours(23, 59, 59, 999); 
         const reportingDateString = yesterdayStart.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         // 5. Fire Core Queries using absolute, pre-casted ISO strings
         const completedTasksToday = await Task.find({
             status: 'completed',
-            updatedAt: { $gte: yesterdayStart, $lte: yesterdayEnd }
+            updatedAt: {  $lte: yesterdayEnd }
         });
         const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
 
@@ -404,8 +405,7 @@ exports.getDailySummary = async (req, res) => {
         // By using strict ISO strings, MongoDB perfectly matches your native ISODate fields!
         // Your target date of "2026-06-03T11:26:42" falls directly between these two boundaries.
         const dsaSolvedTodayList = await DSA.find({
-            status: 'Completed', 
-            lastSolvedAt: { $gte: yesterdayStart, $lte: yesterdayEnd }
+            lastSolvedAt: {$gte:yesterdayStart, $lte: yesterdayEnd }
         });
 
         // 6. DYNAMIC PROJECT PROGRESS TRACKER
@@ -414,12 +414,9 @@ exports.getDailySummary = async (req, res) => {
         activeProjects.forEach(project => {
             if (project.modules) {
                 project.modules.forEach(mod => {
-                    if (mod.steps) {
+                    if (mod.steps && new Date(project.updatedAt) >= yesterdayStart && new Date(project.updatedAt) <= yesterdayEnd) {
                         const stepsDoneYesterday = mod.steps.filter(step => 
-                            step.isCompleted === true && 
-                            step.updatedAt &&
-                            new Date(step.updatedAt) >= yesterdayStart && 
-                            new Date(step.updatedAt) <= yesterdayEnd
+                            step.isCompleted === true
                         ).length;
                         projectProgressPoints += stepsDoneYesterday;
                     }
