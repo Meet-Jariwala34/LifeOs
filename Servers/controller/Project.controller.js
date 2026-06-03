@@ -418,8 +418,8 @@ exports.getDailySummary = async (req, res) => {
                         const stepsDoneYesterday = mod.steps.filter(step => 
                             step.isCompleted === true && 
                             step.updatedAt &&
-                            new Date(step.updatedAt).toISOString() >= yesterdayStart && 
-                            new Date(step.updatedAt).toISOString() <= yesterdayEnd
+                            new Date(step.updatedAt) >= yesterdayStart && 
+                            new Date(step.updatedAt) <= yesterdayEnd
                         ).length;
                         projectProgressPoints += stepsDoneYesterday;
                     }
