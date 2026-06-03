@@ -383,30 +383,34 @@ exports.toggleTaskStep = async (req, res) => {
 
 exports.getDailySummary = async (req, res) => {
     try {
-        // 1. Establish the time boundary for "Yesterday" (The day that just ended)
-        const startOfTargetDay = new Date();
-        startOfTargetDay.setDate(startOfTargetDay.getDate() - 1);
-        startOfTargetDay.setHours(6, 0, 0, 0);
+        // 1. Get the current exact date string inside India (Format: YYYY-MM-DD)
+        const targetISTDateString = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        
+        // 2. Parse that string back into an absolute Date object fixed to Indian Midnight
+        const baseTodayIST = new Date(`${targetISTDateString}T00:00:00+05:30`);
 
-        const endOfTargetDay = new Date();
-        endOfTargetDay.setDate(endOfTargetDay.getDate());
-        endOfTargetDay.setHours(6, 00, 00, 000);
+        // 3. Construct yesterday's exact boundaries (Midnight to 11:59:59 PM IST)
+        const startOfTargetDay = new Date(baseTodayIST.getTime());
+        startOfTargetDay.setDate(startOfTargetDay.getDate() - 1); 
 
-        // 2. Query basic task completions
+        const endOfTargetDay = new Date(baseTodayIST.getTime());
+        endOfTargetDay.setMilliseconds(-1); 
+
+        // Query standard tasks completions
         const completedTasksToday = await Task.find({
             status: 'completed',
             updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
         });
         const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
 
-        // 3. Query DSA completions
+        // 🛡️ RECTIFIED DSA QUERY TRACKER:
+        // Uses 'lastSolvedAt' range check to flawlessly pull problems completed yesterday
         const dsaSolvedTodayList = await DSA.find({
             status: 'Completed', 
-            updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
+            lastSolvedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
         });
 
-        // 4. 🔥 DYNAMIC PROJECT PROGRESS CALCULATOR
-        // We look up all active projects and check how many tier-3 steps were checked off yesterday!
+        // 🔥 DYNAMIC PROJECT PROGRESS CALCULATOR
         const activeProjects = await Project.find();
         let projectProgressPoints = 0;
 
@@ -414,43 +418,38 @@ exports.getDailySummary = async (req, res) => {
             if (project.modules) {
                 project.modules.forEach(mod => {
                     if (mod.steps) {
-                        // Count steps inside modules that were marked completed yesterday
                         const stepsDoneYesterday = mod.steps.filter(step => 
                             step.isCompleted === true && 
                             step.updatedAt >= startOfTargetDay && 
                             step.updatedAt <= endOfTargetDay
                         ).length;
-                        
-                        // Every individual development checklist step completed = 1 Point!
                         projectProgressPoints += stepsDoneYesterday;
                     }
                 });
             }
         });
 
-        // 5. 🔥 DYNAMIC CONTENT PRODUCTION CALCULATOR
-        // Check your content studio queue collection for tracks staged or released yesterday
+        // 🔥 DYNAMIC CONTENT PRODUCTION CALCULATOR
         const contentStagedYesterday = await contetModel.find({
             status: 'Staged',
             updatedAt: { $gte: startOfTargetDay, $lte: endOfTargetDay }
         });
 
-        const todayISTString = startOfTargetDay.toISOString().split('T')[0];
-        const targetBodyTelemetry = await BodyLog.findOne({ date: todayISTString });
+        // Format historical date tag to accurately match the target reporting day (Yesterday)
+        const reportingDateString = startOfTargetDay.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+        const targetBodyTelemetry = await BodyLog.findOne({ date: reportingDateString });
 
-        // 6. Return the fully loaded, zero-free telemetry block to n8n
+        // Return the telemetry block to n8n
         return res.status(200).json({
             success: true,
             telemetry: {
-                date: startOfTargetDay.toISOString().split('T')[0], 
+                date: reportingDateString, 
                 tasksCompletedCount: completedTasksToday.length,
                 completedTaskTitles: completedTasksToday.map(t => t.title),
                 remainingActiveTasks: activeTasksCount,
                 totalActiveProjects: activeProjects.length,
                 dsaSolvedCount: dsaSolvedTodayList.length,
                 dsaProblemTitles: dsaSolvedTodayList.map(p => p.title),
-                
-                // 🟩 Fresh active variables passed down the stream:
                 projectDeltaPoints: projectProgressPoints, 
                 contentStagedCount: contentStagedYesterday.length,
                 dailyCaloriesScore: targetBodyTelemetry ? targetBodyTelemetry.totalCaloriesIntake : 0,
@@ -462,5 +461,4 @@ exports.getDailySummary = async (req, res) => {
         console.error("Failed to generate complete telemetry overview arrays:", error.message);
         return res.status(500).json({ success: false, error: error.message });
     }
-}
-
+};
