@@ -383,38 +383,42 @@ exports.toggleTaskStep = async (req, res) => {
 
 exports.getDailySummary = async (req, res) => {
     try {
-        // 1. Fetch current IST date string (e.g., "2026-06-04" when running at 2 AM)
+        // 1. Fetch current real-world calendar date inside India (Outputs: "2026-06-04")
         const currentISTDateString = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
         
-        // 2. Compute Target Yesterday String precisely ("2026-06-03")
-        const todayMidnight = new Date(`${currentISTDateString}T00:00:00+05:30`);
-        const yesterdayMidnight = new Date(todayMidnight.getTime());
-        yesterdayMidnight.setDate(yesterdayMidnight.getDate() - 1);
+        // 2. Parse out the exact year, month, and day integers safely
+        const [year, month, day] = currentISTDateString.split('-').map(Number);
+
+        // 3. Construct Yesterday's precise calendar date parameters manually
+        // This ensures that if today is June 4th, targetDate becomes June 3rd
+        const targetDate = new Date(year, month - 1, day);
+        targetDate.setDate(targetDate.getDate() - 1);
         
-        const reportingDateString = yesterdayMidnight.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Explicitly "2026-06-03"
+        const reportingDateString = targetDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // Explicitly "2026-06-03"
 
-        // 3. Build Safe JavaScript ISO objects for query thresholds
-        const startWindow = new Date(`${reportingDateString}T00:00:00+05:30`);
-        const endWindow = new Date(`${reportingDateString}T23:59:59.999+05:30`);
+        // 4. 🔥 THE UNBREAKABLE TIME ZONE BOUNDARY STRINGS
+        // Hardcoding the IST offset directly into the string initialization eliminates any server clock mutation bugs
+        const startWindow = new Date(`${reportingDateString}T00:00:00+05:30`); // June 3rd, 12:00:00 AM IST
+        const endWindow = new Date(`${currentISTDateString}T00:00:00+05:30`); // June 4th, 12:00:00 AM IST
 
-        // 4. Fire standard task queries
+        console.log(`🚀 CRITICAL DEBUG - Strict Query Windows Enabled:`);
+        console.log(`👉 Start Target (IST Midnight Yesterday): ${startWindow.toISOString()}`);
+        console.log(`👉 End Target (IST Midnight Today): ${endWindow.toISOString()}`);
+
+        // 5. Fire Core Queries against absolute timestamp markers
         const completedTasksToday = await Task.find({
             status: 'completed',
             updatedAt: { $gte: startWindow, $lte: endWindow }
         });
         const activeTasksCount = await Task.countDocuments({ status: { $ne: 'completed' } });
 
-        // 🛡️ RECTIFIED DSA FIND LOGIC:
-        // We use standard Date comparison operators which Mongo converts automatically 
-        // to match both '+00:00' strings and native Date types seamlessly!
+        // 🛡️ RECTIFIED DSA QUERY LAYER: Matches your +00:00 Mongo document layout perfectly
         const dsaSolvedTodayList = await DSA.find({
             status: 'Completed', 
             lastSolvedAt: { $gte: startWindow, $lte: endWindow }
         });
 
-        console.log(`🔍 Verified DSA Matches Found: ${dsaSolvedTodayList.length}`);
-
-        // 5. PROJECTS PROGRESS TRACKING
+        // 6. DYNAMIC PROJECT PROGRESS TRACKER
         const activeProjects = await Project.find();
         let projectProgressPoints = 0;
         activeProjects.forEach(project => {
@@ -440,10 +444,11 @@ exports.getDailySummary = async (req, res) => {
 
         const targetBodyTelemetry = await BodyLog.findOne({ date: reportingDateString });
 
+        // 7. Stream data down to n8n HTTP node channels
         return res.status(200).json({
             success: true,
             telemetry: {
-                date: reportingDateString, // Will be explicitly "2026-06-03"
+                date: reportingDateString, // "2026-06-03"
                 tasksCompletedCount: completedTasksToday.length,
                 completedTaskTitles: completedTasksToday.map(t => t.title),
                 remainingActiveTasks: activeTasksCount,
@@ -458,7 +463,7 @@ exports.getDailySummary = async (req, res) => {
         });
 
     } catch (error) {
-        console.error("Failed to generate complete telemetry overview arrays:", error.message);
+        console.error("🚨 Summary Telemetry System Crashed:", error.message);
         return res.status(500).json({ success: false, error: error.message });
     }
 };
