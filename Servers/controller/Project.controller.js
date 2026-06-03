@@ -386,11 +386,11 @@ exports.getDailySummary = async (req, res) => {
         // 1. Establish the time boundary for "Yesterday" (The day that just ended)
         const startOfTargetDay = new Date();
         startOfTargetDay.setDate(startOfTargetDay.getDate() - 1);
-        startOfTargetDay.setHours(0, 0, 0, 0);
+        startOfTargetDay.setHours(6, 0, 0, 0);
 
         const endOfTargetDay = new Date();
-        endOfTargetDay.setDate(endOfTargetDay.getDate() - 1);
-        endOfTargetDay.setHours(23, 59, 59, 999);
+        endOfTargetDay.setDate(endOfTargetDay.getDate());
+        endOfTargetDay.setHours(6, 00, 00, 000);
 
         // 2. Query basic task completions
         const completedTasksToday = await Task.find({
