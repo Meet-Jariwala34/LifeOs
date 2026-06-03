@@ -438,6 +438,8 @@ exports.getDailySummary = async (req, res) => {
             success: true,
             telemetry: {
                 date: reportingDateString, // "2026-06-03"
+                start:yesterdayStart,
+                end:yesterdayEnd,
                 tasksCompletedCount: completedTasksToday.length,
                 completedTaskTitles: completedTasksToday.map(t => t.title),
                 remainingActiveTasks: activeTasksCount,
