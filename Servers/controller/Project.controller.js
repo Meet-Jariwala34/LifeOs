@@ -381,12 +381,6 @@ exports.toggleTaskStep = async (req, res) => {
     }
 };
 
-const Task = require('../model/Task');
-const Project = require('../model/Project');
-const DSA = require('../model/Dsa') || require('../model/dsa') || mongoose.model('DSA'); // Enforce strict fallback binding
-const contetModel = require('../model/Content'); 
-const BodyLog = require('../model/BodyLog');
-
 exports.getDailySummary = async (req, res) => {
     try {
         // 1. Fetch current IST date string (e.g., "2026-06-04" when running at 2 AM)
