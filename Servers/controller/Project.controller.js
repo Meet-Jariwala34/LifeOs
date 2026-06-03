@@ -405,6 +405,7 @@ exports.getDailySummary = async (req, res) => {
         // By using strict ISO strings, MongoDB perfectly matches your native ISODate fields!
         // Your target date of "2026-06-03T11:26:42" falls directly between these two boundaries.
         const dsaSolvedTodayList = await DSA.find({
+            revisionStage : { $ne : 0 },
             lastSolvedAt: {$gte:yesterdayStart, $lte: yesterdayEnd }
         });
 
